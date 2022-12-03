@@ -1212,6 +1212,19 @@
     }
     return typeof window !== 'undefined' && typeof document !== 'undefined';
   }();
+
+  /**
+   * Determine if we're running in a standard browser webWorker environment
+   *
+   * Although the `isStandardBrowserEnv` method indicates that
+   * `allows axios to run in a web worker`, the WebWorker will still be
+   * filtered out due to its judgment standard
+   * `typeof window !== 'undefined' && typeof document !== 'undefined'`.
+   * This leads to a problem when axios post `FormData` in webWorker
+   */
+  var isStandardBrowserWebWorkerEnv = function () {
+    return typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope && typeof self.importScripts === 'function';
+  }();
   var platform = {
     isBrowser: true,
     classes: {
@@ -1220,6 +1233,7 @@
       Blob: Blob
     },
     isStandardBrowserEnv: isStandardBrowserEnv,
+    isStandardBrowserWebWorkerEnv: isStandardBrowserWebWorkerEnv,
     protocols: ['http', 'https', 'file', 'blob', 'url', 'data']
   };
 
@@ -2008,7 +2022,7 @@
           config.signal.removeEventListener('abort', onCanceled);
         }
       }
-      if (utils.isFormData(requestData) && platform.isStandardBrowserEnv) {
+      if (utils.isFormData(requestData) && (platform.isStandardBrowserEnv || platform.isStandardBrowserWebWorkerEnv)) {
         requestHeaders.setContentType(false); // Let the browser set it
       }
 
@@ -2232,7 +2246,7 @@
       config.cancelToken.throwIfRequested();
     }
     if (config.signal && config.signal.aborted) {
-      throw new CanceledError();
+      throw new CanceledError(null, config);
     }
   }
 
@@ -2824,6 +2838,9 @@
 
   // Expose isAxiosError
   axios.isAxiosError = isAxiosError;
+
+  // Expose mergeConfig
+  axios.mergeConfig = mergeConfig;
   axios.AxiosHeaders = AxiosHeaders$1;
   axios.formToJSON = function (thing) {
     return formDataToJSON(utils.isHTMLForm(thing) ? new FormData(thing) : thing);
